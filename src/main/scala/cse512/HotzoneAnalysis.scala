@@ -12,26 +12,27 @@ object HotzoneAnalysis {
 
   def runHotZoneAnalysis(spark: SparkSession, pointPath: String, rectanglePath: String): DataFrame = {
 
-    var pointDf = spark.read.format("com.databricks.spark.csv").option("delimiter",";").option("header","false").load(pointPath);
-    pointDf.createOrReplaceTempView("point")
+    var targetDF = spark.read.format("com.databricks.spark.csv").option("delimiter",";").option("header","false").load(pointPath);
+    targetDF.createOrReplaceTempView("point")
 
     // Parse point data formats
     spark.udf.register("trim",(string : String)=>(string.replace("(", "").replace(")", "")))
-    pointDf = spark.sql("select trim(_c5) as _c5 from point")
-    pointDf.createOrReplaceTempView("point")
+    targetDF = spark.sql("select trim(_c5) as _c5 from point")
+    targetDF.createOrReplaceTempView("point")
 
     // Load rectangle data
-    val rectangleDf = spark.read.format("com.databricks.spark.csv").option("delimiter","\t").option("header","false").load(rectanglePath);
-    rectangleDf.createOrReplaceTempView("rectangle")
+    val DF_Rec = spark.read.format("com.databricks.spark.csv").option("delimiter","\t").option("header","false").load(rectanglePath);
+    DF_Rec.createOrReplaceTempView("rectangle")
 
     // Join two datasets
     spark.udf.register("ST_Contains",(queryRectangle:String, pointString:String)=>(HotzoneUtils.ST_Contains(queryRectangle, pointString)))
-    val joinDf = spark.sql("select rectangle._c0 as rectangle, point._c5 as point from rectangle,point where ST_Contains(rectangle._c0,point._c5)")
-    joinDf.createOrReplaceTempView("joinResult")
+    val DF_j = spark.sql("select rectangle._c0 as rectangle, point._c5 as point from rectangle,point where ST_Contains(rectangle._c0,point._c5)")
+    DF_j.createOrReplaceTempView("joinResult")
 
-    // YOU NEED TO CHANGE THIS PART
+    val pred = spark.sql("SELECT rectangle, COUNT(point) as count FROM joinResult GROUP BY rectangle ORDER BY rectangle")
+  
 
-    return joinDf // YOU NEED TO CHANGE THIS PART
+    return pred
   }
 
 }
