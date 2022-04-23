@@ -5,7 +5,7 @@ object HotzoneUtils {
   def ST_Contains(queryRectangle: String, pointString: String ): Boolean = {
     // queryRectangle format  -74.189999,40.671001,-74.153071,40.707982
     // pointString format      -74.001580000000004,40.719382000000003
-  val coor_rect = queryRectangle.split(",")
+  	val coor_rect = queryRectangle.split(",")
 	val point_coor = pointString.split(",")
 
 	val p_x: Double = point_coor(0).trim.toDouble
