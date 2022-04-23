@@ -12,27 +12,33 @@ object HotzoneAnalysis {
 
   def runHotZoneAnalysis(spark: SparkSession, pointPath: String, rectanglePath: String): DataFrame = {
 
-    var targetDF = spark.read.format("com.databricks.spark.csv").option("delimiter",";").option("header","false").load(pointPath);
-    targetDF.createOrReplaceTempView("point")
+    var pointDf = spark.read.format("com.databricks.spark.csv").option("delimiter",";").option("header","false").load(pointPath);
+    pointDf.createOrReplaceTempView("point")
 
     // Parse point data formats
     spark.udf.register("trim",(string : String)=>(string.replace("(", "").replace(")", "")))
-    targetDF = spark.sql("select trim(_c5) as _c5 from point")
-    targetDF.createOrReplaceTempView("point")
+    pointDf = spark.sql("select trim(_c5) as _c5 from point")
+    pointDf.createOrReplaceTempView("point")
 
     // Load rectangle data
-    val DF_Rec = spark.read.format("com.databricks.spark.csv").option("delimiter","\t").option("header","false").load(rectanglePath);
-    DF_Rec.createOrReplaceTempView("rectangle")
+    val rectangleDf = spark.read.format("com.databricks.spark.csv").option("delimiter","\t").option("header","false").load(rectanglePath);
+    rectangleDf.createOrReplaceTempView("rectangle")
 
     // Join two datasets
     spark.udf.register("ST_Contains",(queryRectangle:String, pointString:String)=>(HotzoneUtils.ST_Contains(queryRectangle, pointString)))
-    val DF_j = spark.sql("select rectangle._c0 as rectangle, point._c5 as point from rectangle,point where ST_Contains(rectangle._c0,point._c5)")
-    DF_j.createOrReplaceTempView("joinResult")
+    val joinDf = spark.sql("select rectangle._c0 as rectangle, point._c5 as point from rectangle,point where ST_Contains(rectangle._c0,point._c5)")
+    joinDf.createOrReplaceTempView("joinResult")
 
-    val pred = spark.sql("SELECT rectangle, COUNT(point) as count FROM joinResult GROUP BY rectangle ORDER BY rectangle")
-  
+    val countDf = joinDf.groupBy("rectangle").count()
+    val sortedDf = countDf.sort("rectangle").coalesce(1)
+    sortedDf.show()
 
-    return pred
+    //Solution below was creating a new csv file for every record
+    // val sortedDf = spark.sql("SELECT rectangle, COUNT(point) as count FROM joinResult GROUP BY rectangle ORDER BY rectangle")
+    // sortedDf.createOrReplaceTempView("soretedResult")
+    // sortedDf.show()
+
+    return sortedDf
   }
 
 }
